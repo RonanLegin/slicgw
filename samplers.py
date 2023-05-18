@@ -105,7 +105,7 @@ def mala_step(key, current_state, epsilon, score_fn, mass_matrix=None):
     proposed_score = score_fn(proposed_position)
 
 
-    delta_logp_val = delta_logp(current_position, proposed_position, score_fn)
+    delta_logp_val = delta_logp(current_position, proposed_position, score_fn, delta_logp_steps=2)
     kernel_forward = jnp.sum((proposed_position - current_position - epsilon * current_score) ** 2, axis=dims) / 4 / epsilon
     kernel_backward = jnp.sum((current_position - proposed_position - epsilon * proposed_score) ** 2, axis=dims) / 4 / epsilon
     log_alpha = delta_logp_val - kernel_backward + kernel_forward
@@ -127,6 +127,10 @@ def get_sample_fn(step_fn, step_burn_fn, score_fn, mass_matrix=None):
 
       chain = []
       chain_score = []
+
+      chain.append(current_state[0])
+      chain_score.append(current_state[1])
+      
       accepted_count = 0
       total_proposed = 0
       for step in (pbar := tqdm(range(n))):
