@@ -199,7 +199,7 @@ Mc, eta = ms_to_Mc_eta(np.array([m1_msun, m2_msun]))
 theta_true = jnp.array([[Mc, eta, chi1, chi2, dist_mpc, tc, phic]], dtype=jnp.float32)
 theta_labels = ["Mc", "eta", "chi1","chi2","dist_mpc", "tc", "phic"]
 
-noise = jnp.array(np.load('simulated_noise.npy'))[0]
+noise = jnp.array(np.load('simulated_noise.npy'), dtype=jnp.float32)[0]
 signal = gw_source(theta_true[0], args)
 data = signal[1:] + noise
 data = data[None]

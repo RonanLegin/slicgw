@@ -27,6 +27,8 @@ import h5py
 from scipy.signal.windows import tukey
 
 
+dir_name = 'gw150914/'
+os.makedirs(dir_name, exist_ok=True)
 
 srate = 4096
 seglen = 4
@@ -170,8 +172,6 @@ forward_fn = vmap(gw_source, in_axes=(0, None))
 jacobian_fn = vmap(jacfwd(gw_source, argnums=0), in_axes=(0, None))
 score_likelihood_fn = get_score_likelihood(forward_fn, jacobian_fn, score_noise_fn, mask_slic_input)
 
-#print(score_noise_fn(data[:,1:], jnp.zeros((theta.shape[0],), jnp.float32)).dtype)
-
 """ Preprocess data """
 
 data = jnp.array([data_fd.real, data_fd.imag], dtype=jnp.float32) / strain_scale
@@ -253,6 +253,9 @@ chain, chain_score = sample_fn(rng, theta_initial, step_size, num_steps, burn_in
 
 chain = np.array(chain)
 chain_score = np.array(chain_score)
+np.save(dir_name + 'chain.npy', chain)
+np.save(dir_name + 'chain_score.npy', chain_score)
+
 ndim = chain.shape[-1]
 
 fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
@@ -262,14 +265,14 @@ for j, ax in enumerate(axs):
   ax.axhline(theta_true[0,j], color='k', label='Truth')
   ax.set_title('Langevin Chain Param {}'.format(theta_labels[j]))
 plt.legend()
-plt.savefig('chain.png', bbox_inches='tight')
+plt.savefig(dir_name + 'chain.png', bbox_inches='tight')
 
 fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
 for j, ax in enumerate(axs):
   for i in range(batch_size):
     ax.plot(chain_score[:,i,j])
   ax.set_title('Score Chain Param {}'.format(theta_labels[j]))
-plt.savefig('chain_score.png', bbox_inches='tight')
+plt.savefig(dir_name + 'chain_score.png', bbox_inches='tight')
 
 samples = np.array(chain).reshape(-1,ndim)
 fig = plt.figure(figsize=(20,16))
@@ -281,5 +284,5 @@ fig = corner.corner(
     truths=(theta_true[0,:]),
     fig=fig, bins=20
     )
-plt.savefig('corner.png', bbox_inches='tight')
+plt.savefig(dir_name + 'corner.png', bbox_inches='tight')
 
