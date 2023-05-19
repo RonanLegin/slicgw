@@ -6,6 +6,18 @@ from tqdm import tqdm
 jax.config.update("jax_enable_x64", False)
 
 
+def get_gaussian_log_likelihood(forward_fn_novmap, mask_slic_input, mask_additional=None):
+    def gaussian_log_likelihood(theta, fd_data, args):
+        f = args['f']
+        psd = args['psd']
+        fd_residual = fd_data - forward_fn_novmap(theta, args)
+        fd_residual *= mask_slic_input
+        log_like = -2.*jnp.sum((fd_residual[:,0]**2 + fd_residual[:,1]**2)/psd)*(f[1] - f[0])
+        # the last term is delta_f = 1/T where T for us is 4 s
+        return log_like
+    return gaussian_log_likelihood
+
+
 def get_mask_slic_input(f, f_low, Nsize, dtype='float32'):
   mask = np.ones((1,Nsize, 2), dtype=dtype)
   mask[:,f < f_low,:] = 0. # Mask input same as training data
