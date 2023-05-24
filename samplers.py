@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 jax.config.update("jax_enable_x64", False)
 
+jnp_type = jnp.float32
 
 def get_gaussian_log_likelihood(forward_fn_novmap, mask_slic_input, mask_additional=None):
     def gaussian_log_likelihood(theta, fd_data, args):
@@ -23,9 +24,13 @@ def get_mask_slic_input(f, f_low, Nsize, dtype='float32'):
   mask[:,f < f_low,:] = 0. # Mask input same as training data
   return jnp.array(mask)
 
+
+
 def log_prior_eta(state, min_val, max_val):
-    variable = state[:, 1]
+    variable = state[:, -1]
     return jnp.where((min_val <= variable) & (variable <= max_val), 0., -jnp.inf)
+
+
 
 def get_score_likelihood(forward_fn, jacobian_fn, score_fn, mask_slic_input, mask_additional=None):
     
@@ -34,8 +39,8 @@ def get_score_likelihood(forward_fn, jacobian_fn, score_fn, mask_slic_input, mas
         jacobian = jacobian_fn(theta, args)
 
         x *= mask_slic_input
-        score = score_fn(x[:,1:], jnp.zeros((theta.shape[0],), jnp.float32))
-        score = jnp.concatenate((jnp.zeros((theta.shape[0],1,2), jnp.float32), score), axis=1)
+        score = score_fn(x[:,1:], jnp.zeros((theta.shape[0],), jnp_type))
+        score = jnp.concatenate((jnp.zeros((theta.shape[0],1,2), jnp_type), score), axis=1)
         score *= mask_slic_input
 
         #score *= mask_additional
@@ -90,7 +95,7 @@ def ula_step(key, current_state, epsilon, score_fn, mass_matrix=None):
         proposed_position = current_position + epsilon * current_score + jnp.sqrt(2 * epsilon) * jax.random.normal(subkey, current_position.shape)
     else:
         proposed_position = current_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, current_score) + jnp.sqrt(2 * epsilon) * jnp.einsum('ij,bj->bi', mass_matrix, jax.random.normal(subkey, current_position.shape))
-    
+        
     proposed_score = score_fn(proposed_position)
 
     return (proposed_position, proposed_score), None , key
@@ -103,23 +108,35 @@ def mala_step(key, current_state, epsilon, score_fn, mass_matrix=None):
     dims = list(range(1, len(current_position.shape)))
     key1, key2 = jax.random.split(key, 2)
 
-    #score_current_state = score_current_state#score_fn(current_state)
 
     if mass_matrix is None:
         proposed_position = current_position + epsilon * current_score + jnp.sqrt(2 * epsilon) * jax.random.normal(key1, current_position.shape)
     else:
         proposed_position = current_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, current_score) + jnp.sqrt(2 * epsilon) * jnp.einsum('ij,bj->bi', mass_matrix, jax.random.normal(key1, current_position.shape))
     
-    #condition = (0. <= proposed_position[..., 1]) & (proposed_position[..., 1] <= 0.25)
-    #condition = condition[:, None]  # Expand dimensions to match proposed_state and current_state
-    #proposed_state = jnp.where(condition, proposed_state, current_state)
 
+    ###### THIS ASSUMES ETA IS LAST PARAMETER
+    condition = (0. <= proposed_position[..., -1]) & (proposed_position[..., -1] <= 0.25)
+    condition = condition[:, None]  # Expand dimensions to match proposed_state and current_state
+    proposed_position = jnp.where(condition, proposed_position, current_position)
+    ##############
+    
     proposed_score = score_fn(proposed_position)
 
 
-    delta_logp_val = delta_logp(current_position, proposed_position, score_fn, delta_logp_steps=2)
-    kernel_forward = jnp.sum((proposed_position - current_position - epsilon * current_score) ** 2, axis=dims) / 4 / epsilon
-    kernel_backward = jnp.sum((current_position - proposed_position - epsilon * proposed_score) ** 2, axis=dims) / 4 / epsilon
+    delta_logp_val = delta_logp(current_position, proposed_position, score_fn, delta_logp_steps=10)
+    
+    kernel_forward = jax.scipy.stats.multivariate_normal.logpdf(
+        proposed_position,
+        current_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, current_score),
+        2 * epsilon * mass_matrix @ mass_matrix.T)
+
+    kernel_backward = jax.scipy.stats.multivariate_normal.logpdf(
+        current_position, 
+        proposed_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, proposed_score),
+        2 * epsilon * mass_matrix @ mass_matrix.T)
+
+
     log_alpha = delta_logp_val - kernel_backward + kernel_forward
     accepted, key2 = accept(key2, log_alpha)
 
