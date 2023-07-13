@@ -73,6 +73,7 @@ def plot_results(chain, chain_score, truth, labels, filepath, index):
       ax.set_title('Langevin Chain Param {}'.format(labels[j]))
     plt.legend()
     plt.savefig(filepath + 'chain{}.png'.format(index), bbox_inches='tight')
+    plt.close(fig)
 
     fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
     for j, ax in enumerate(axs):
@@ -80,6 +81,7 @@ def plot_results(chain, chain_score, truth, labels, filepath, index):
         ax.plot(chain_score[:,i,j])
       ax.set_title('Score Chain Param {}'.format(labels[j]))
     plt.savefig(filepath + 'chain_score{}.png'.format(index), bbox_inches='tight')
+    plt.close(fig)
 
     samples = np.array(chain).reshape(-1,ndim)
     fig = plt.figure(figsize=(20,16))
@@ -92,7 +94,7 @@ def plot_results(chain, chain_score, truth, labels, filepath, index):
         fig=fig, bins=20
         )
     plt.savefig(filepath + 'corner{}.png'.format(index), bbox_inches='tight')
-
+    plt.close(fig)
 
 def compute_precond_matrix(score_fn, theta_ref, data, args):
     def partial_gradient(theta, data, args, i):
