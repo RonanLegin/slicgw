@@ -11,6 +11,8 @@ from scoregen.models import State, init_model, get_config, get_score_fn
 from scoregen.sampling import get_sampler as get_sampler_noise
 from scoregen import VESDE
 
+import pandas as pd
+import h5py
 
 def read_data(path, **kws):
     with h5py.File(path, 'r') as f:
@@ -55,6 +57,97 @@ def load_score_model(config_path, checkpoint_path):
 
 ### Plot results ###
 
+# def plot_results(chain, chain_score, truth, labels, filepath, index):
+#     chain = np.array(chain)
+#     chain_score = np.array(chain_score)
+
+#     N = chain.shape[0]
+#     batch_size = chain.shape[1]
+#     ndim = chain.shape[2]
+    
+#     truth = np.array(truth).reshape(ndim)
+
+#     fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
+#     for j, ax in enumerate(axs):
+#       for i in range(batch_size):
+#         ax.plot(chain[:,i,j])
+#       ax.axhline(truth[j], color='k', label='Truth')
+#       ax.set_title('Langevin Chain Param {}'.format(labels[j]))
+#     plt.legend()
+#     plt.savefig(filepath + 'chain{}.png'.format(index), bbox_inches='tight')
+#     plt.close(fig)
+
+#     fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
+#     for j, ax in enumerate(axs):
+#       for i in range(batch_size):
+#         ax.plot(chain_score[:,i,j])
+#       ax.set_title('Score Chain Param {}'.format(labels[j]))
+#     plt.savefig(filepath + 'chain_score{}.png'.format(index), bbox_inches='tight')
+#     plt.close(fig)
+
+#     samples = np.array(chain).reshape(-1,ndim)
+#     fig = plt.figure(figsize=(20,16))
+#     fig = corner.corner(
+#         samples,
+#         color='black',
+#         labels=labels,
+#         hist2d_kwargs={"normed": True}, 
+#         truths=(truth),
+#         fig=fig, bins=20
+#         )
+#     plt.savefig(filepath + 'corner{}.png'.format(index), bbox_inches='tight')
+#     plt.close(fig)
+
+
+def plot_complex_scatter(fourier_data, filepath, index, x_range=(-1.5, 1.5), y_range=(-1.5, 1.5), dot_size=2):
+    # reshape the array to be at least 2D
+    fourier_data = np.atleast_2d(fourier_data)
+
+    # separate real and imaginary parts
+    real_part = fourier_data[..., 0]
+    imag_part = fourier_data[..., 1]
+    
+    A = np.sqrt(real_part**2 + imag_part**2)
+    real_part_normalized = real_part/A
+    imag_part_normalized  = imag_part/A
+    
+    # plot
+    fig, axs = plt.subplots(fourier_data.shape[0], figsize=(8,6*fourier_data.shape[0]))
+    axs = np.atleast_1d(axs)  # ensure axs is an array, even when ndim = 1
+
+    for i, ax in enumerate(axs):
+        ax.scatter(real_part_normalized [i], imag_part_normalized [i], s=dot_size, alpha=0.3)  # scatter plot
+        ax.set_xlabel('Real Part')
+        ax.set_ylabel('Imaginary Part')
+        ax.set_xlim(x_range)  # set x-axis limits
+        ax.set_ylim(y_range)  # set y-axis limits
+        ax.set_title(f'Scatter plot for batch {i+1}')
+    plt.savefig(filepath + 'scatter{}.png'.format(index), bbox_inches='tight')
+    plt.close(fig)
+
+    
+def plot_phase_vs_frequency(fourier_data, f, filepath, index, dot_size=5):
+    # reshape the array to be at least 3D, and combine real and imaginary parts
+    fourier_data = np.atleast_3d(fourier_data)
+    complex_data = fourier_data[..., 0] + 1j * fourier_data[..., 1]
+
+    # calculate phase
+    phase = np.angle(complex_data)
+
+    # plot
+    fig, axs = plt.subplots(fourier_data.shape[0], figsize=(8,6*fourier_data.shape[0]))
+    axs = np.atleast_1d(axs)  # ensure axs is an array, even when ndim = 1
+
+    for i, ax in enumerate(axs):
+        ax.scatter(f, phase[i], s=dot_size)  # scatter plot with specified dot size
+        ax.set_xlabel('Frequency')
+        ax.set_ylabel('Phase')
+        ax.set_title(f'Phase vs Frequency plot for batch {i+1}')
+    plt.savefig(filepath + 'phase_vs_frequency{}.png'.format(index), bbox_inches='tight')
+    plt.close(fig)
+
+    
+    
 def plot_results(chain, chain_score, truth, labels, filepath, index):
     chain = np.array(chain)
     chain_score = np.array(chain_score)
@@ -66,6 +159,7 @@ def plot_results(chain, chain_score, truth, labels, filepath, index):
     truth = np.array(truth).reshape(ndim)
 
     fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
+    axs = np.atleast_1d(axs)  # ensure axs is an array, even when ndim = 1
     for j, ax in enumerate(axs):
       for i in range(batch_size):
         ax.plot(chain[:,i,j])
@@ -76,6 +170,7 @@ def plot_results(chain, chain_score, truth, labels, filepath, index):
     plt.close(fig)
 
     fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
+    axs = np.atleast_1d(axs)  # ensure axs is an array, even when ndim = 1
     for j, ax in enumerate(axs):
       for i in range(batch_size):
         ax.plot(chain_score[:,i,j])
@@ -95,6 +190,7 @@ def plot_results(chain, chain_score, truth, labels, filepath, index):
         )
     plt.savefig(filepath + 'corner{}.png'.format(index), bbox_inches='tight')
     plt.close(fig)
+
 
 def compute_precond_matrix(score_fn, theta_ref, data, args):
     def partial_gradient(theta, data, args, i):
