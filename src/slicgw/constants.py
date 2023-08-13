@@ -2,6 +2,7 @@ import numpy as np
 import jax.numpy as jnp
 
 jax_dtype = jnp.float32
+#jax_dtype = jnp.float64
 
 ### Define constants
 
@@ -31,3 +32,7 @@ antenna_patterns = {
     'L1': [-0.5274334329518102, 0.20520960891727436]
 }
 Fp, Fc = antenna_patterns[ifo]
+
+whiten_scale_factor = 100
+td_crop_index_start = 6000
+td_crop_index_end = 6000+4096
