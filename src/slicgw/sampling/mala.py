@@ -29,23 +29,23 @@ def delta_logp(current_state, proposed_state, score_fn, delta_logp_steps=2):
     return simps(integrand, 0., 1., delta_logp_steps)
 
 
-def accept(key, log_alpha):
-    key, subkey = jax.random.split(key)
-    accepted = jnp.log(jax.random.uniform(subkey, log_alpha.shape, dtype=jax_dtype)) < log_alpha
-    return accepted, key
+def accept(rng, log_alpha):
+    rng, step_rng = jax.random.split(rng)
+    accepted = jnp.log(jax.random.uniform(step_rng, log_alpha.shape, dtype=jax_dtype)) < log_alpha
+    return accepted, rng
 
 
 
-def mala_step(key, current_state, epsilon, score_fn, mass_matrix=None):
+def mala_step(rng, current_state, epsilon, score_fn, mass_matrix=None):
 
     current_position, current_score = current_state
 
     dims = list(range(1, len(current_position.shape)))
-    key1, key2 = jax.random.split(key, 2)
+    rng, step_rng = jax.random.split(rng)
 
 
     if mass_matrix is None:
-        proposed_position = current_position + epsilon * current_score + jnp.sqrt(2 * epsilon) * jax.random.normal(key1, current_position.shape, dtype=jax_dtype)
+        proposed_position = current_position + epsilon * current_score + jnp.sqrt(2 * epsilon) * jax.random.normal(step_rng, current_position.shape, dtype=jax_dtype)
         
         proposed_score = score_fn(proposed_position)
 
@@ -62,7 +62,7 @@ def mala_step(key, current_state, epsilon, score_fn, mass_matrix=None):
             2 * epsilon)
         
     else:
-        proposed_position = current_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, current_score) + jnp.sqrt(2 * epsilon) * jnp.einsum('ij,bj->bi', mass_matrix, jax.random.normal(key1, current_position.shape, dtype=jax_dtype))
+        proposed_position = current_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, current_score) + jnp.sqrt(2 * epsilon) * jnp.einsum('ij,bj->bi', mass_matrix, jax.random.normal(step_rng, current_position.shape, dtype=jax_dtype))
         
         proposed_score = score_fn(proposed_position)
 
@@ -89,9 +89,9 @@ def mala_step(key, current_state, epsilon, score_fn, mass_matrix=None):
 
 
     log_alpha = delta_logp_val - kernel_backward + kernel_forward
-    accepted, key2 = accept(key2, log_alpha)
+    accepted, rng = accept(rng, log_alpha)
 
     proposed_position = jnp.where(accepted[..., jnp.newaxis], proposed_position, current_position)
     proposed_score = jnp.where(accepted[..., jnp.newaxis], proposed_score, current_score)
 
-    return (proposed_position, proposed_score), accepted, key2  # Also return the updated key
+    return (proposed_position, proposed_score), accepted, rng  # Also return the updated key
