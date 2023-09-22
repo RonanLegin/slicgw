@@ -1,7 +1,7 @@
-# SLICGW
+# slicgw
 Learning Non-Gaussian Noise in Gravitational Waves using SLIC
 
-`SLICGW` is a Python package developed for learning non-Gaussian noise in gravitational waves using SLIC. This README provides a step-by-step guide to setting up and running the `SLICGW` code on the Rusty cluster.
+`slicgw` is a Python package developed for learning non-Gaussian noise in gravitational waves using SLIC. This README provides a step-by-step guide to setting up and running the `slicgw` code on the Rusty cluster.
 
 ## Installation Steps
 
