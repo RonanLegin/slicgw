@@ -19,7 +19,6 @@ def get_score_likelihood(forward_fn_vmap, jacobian_fn_vmap, score_fn, time_slic=
         #    score *= mask_additional
 
         score = -jnp.einsum('bi,bij->bj', score.reshape(theta.shape[0],-1), jacobian.reshape(theta.shape[0],-1,theta.shape[-1]))
-        #print(score)
         return score
     
     return score_likelihood

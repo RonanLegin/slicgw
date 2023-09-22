@@ -78,16 +78,7 @@ def mala_step(rng, current_state, epsilon, score_fn, mass_matrix=None):
             proposed_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, proposed_score),
             2 * epsilon * mass_matrix @ mass_matrix.T)
     
-
-    # ###### THIS ASSUMES ETA IS LAST PARAMETER
-    # condition = (0. <= proposed_position[..., -1]) & (proposed_position[..., -1] <= 0.25)
-    # condition = condition[:, None]  # Expand dimensions to match proposed_state and current_state
-    # proposed_position = jnp.where(condition, proposed_position, current_position)
-    # ##############
     
-
-
-
     log_alpha = delta_logp_val - kernel_backward + kernel_forward
     accepted, rng = accept(rng, log_alpha)
 

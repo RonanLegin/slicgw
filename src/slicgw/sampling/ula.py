@@ -6,7 +6,6 @@ import jax
 def ula_step(rng, current_state, epsilon, score_fn, mass_matrix=None):
 
     current_position, current_score = current_state
-
     rng, step_rng = jax.random.split(rng)
 
     if mass_matrix is None:
