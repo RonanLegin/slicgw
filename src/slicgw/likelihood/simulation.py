@@ -7,7 +7,7 @@ from slicgw.constants import dt, jax_dtype, td_crop_index_start, td_crop_index_e
 
 
 
-def model1(theta, args):
+def model_fd(theta, args):
     
     f = args['f']
     f_ref = args['f_ref']
@@ -25,7 +25,7 @@ def model1(theta, args):
     inclination = theta[7]
 
     theta = jnp.array([Mc, eta, chi1, chi2, dist_mpc, tc, phic, inclination, 0.], dtype=jax_dtype)
-    hp_ripple, hc_ripple = IMRPhenomD.gen_IMRPhenomD_polar(f, theta, f_ref) # Remove zero frequency
+    hp_ripple, hc_ripple = IMRPhenomD.gen_IMRPhenomD_hphc(f, theta, f_ref) # Remove zero frequency
 
     source_p = Fp * jnp.stack([hp_ripple.real, hp_ripple.imag])
     source_c = Fc * jnp.stack([hc_ripple.real, hc_ripple.imag])
@@ -34,7 +34,7 @@ def model1(theta, args):
     source = jnp.nan_to_num(source)
     return jnp.asarray(source, dtype=jax_dtype)
 
-def model1_td_white(theta, args):
+def model_td_whitened(theta, args):
     
     f = args['f']
     f_ref = args['f_ref']
@@ -54,7 +54,7 @@ def model1_td_white(theta, args):
     inclination = theta[7]
 
     theta = jnp.array([Mc, eta, chi1, chi2, dist_mpc, tc, phic, inclination, 0.], dtype=jax_dtype)
-    hp_ripple, hc_ripple = IMRPhenomD.gen_IMRPhenomD_polar(f, theta, f_ref) # Remove zero frequency
+    hp_ripple, hc_ripple = IMRPhenomD.gen_IMRPhenomD_hphc(f, theta, f_ref) # Remove zero frequency
 
     source_p = Fp * jnp.stack([hp_ripple.real, hp_ripple.imag])
     source_c = Fc * jnp.stack([hc_ripple.real, hc_ripple.imag])
@@ -63,15 +63,9 @@ def model1_td_white(theta, args):
     source = jnp.nan_to_num(source)
     
     source_fd = source[:,0] + 1j*source[:,1]
-    source_fd_whiten = source_fd / psd_sqrt#jnp.sqrt(psd_avg)
+    source_fd_whiten = source_fd / psd_sqrt
     source_td_whiten = jnp.fft.irfft(source_fd_whiten) / dt
     source_td_whiten = source_td_whiten[td_crop_index_start:td_crop_index_end] / whiten_scale_factor
     
     return jnp.asarray(source_td_whiten, dtype=jax_dtype)
-
-def model_td_toy(theta, args):
-    amp = theta[0]
-    x = jnp.linspace(-100., 100.,  td_crop_index_end-td_crop_index_start, dtype=jax_dtype)
-    source_td = jnp.where(x == 0, amp * 1.0, amp * jnp.sin(jnp.pi * x) / (jnp.pi * x))
-    return jnp.asarray(source_td, dtype=jax_dtype)
     

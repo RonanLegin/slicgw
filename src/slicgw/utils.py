@@ -13,6 +13,7 @@ from scoregen import VESDE
 
 import pandas as pd
 import h5py
+import os
 
 def read_data(path, **kws):
     with h5py.File(path, 'r') as f:
@@ -53,7 +54,22 @@ def load_score_model(config_path, checkpoint_path):
 
 
 
+def get_latest_checkpoint(checkpoint_dir):
+    # Get list of all checkpoints
+    checkpoints = os.listdir(checkpoint_dir)
 
+    # Remove non-integer named checkpoints if any
+    checkpoints = [ckpt for ckpt in checkpoints if ckpt.isdigit()]
+
+    # If there are no valid checkpoints, return None
+    if not checkpoints:
+        return None
+
+    # Convert to integer and find the maximum (latest)
+    checkpoints = [int(ckpt) for ckpt in checkpoints]
+    latest_checkpoint = max(checkpoints)
+
+    return latest_checkpoint
 
 ### Plot results ###
 
