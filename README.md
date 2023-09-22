@@ -52,7 +52,7 @@ pip install --upgrade git+https://github.com/google/flax.git
 ### 8. Installing RippleGW and Corner
 Finally, install `ripplegw` and `corner` packages:
 ```bash
-pip install ripplegw corner
+pip3 install ripplegw corner
 ```
 
 ## Possible Issues and Resolutions
