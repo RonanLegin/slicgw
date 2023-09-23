@@ -32,7 +32,7 @@ pip install --upgrade pip
 ### 5. Installing JAX with CUDA Support
 Install JAX with CUDA support from the specified URL:
 ```bash
-pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade "jax[cuda11_pip]==0.4.14" jaxlib==0.4.14 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
 ### 6. Installing Flax from GitHub
