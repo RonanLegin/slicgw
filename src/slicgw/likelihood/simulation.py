@@ -48,6 +48,7 @@ def model_td_whitened(theta, args):
     eta = theta[1]
     chi1 = theta[2]
     chi2 = theta[3]
+    # the strain_scale is not applied here since the td training data was not scaled by it
     dist_mpc = theta[4]# * strain_scale
     tc = theta[5]
     phic = theta[6]
@@ -62,9 +63,11 @@ def model_td_whitened(theta, args):
     source = jnp.transpose(source, axes=(1,0))
     source = jnp.nan_to_num(source)
     
+    # Whiten the signal using the sqrt of the power spectrum computed from the training data
     source_fd = source[:,0] + 1j*source[:,1]
     source_fd_whiten = source_fd / psd_sqrt
     source_td_whiten = jnp.fft.irfft(source_fd_whiten) / dt
+    # The whiten_scale_factor is used to bring the noise down to sigma=1
     source_td_whiten = source_td_whiten[td_crop_index_start:td_crop_index_end] / whiten_scale_factor
     
     return jnp.asarray(source_td_whiten, dtype=jax_dtype)
