@@ -6,7 +6,7 @@
 #SBATCH --time=0-24:00:00     # DD-HH:MM:SS
 
 module purge
-source ~/envs/slicgw2/bin/activate
+source ~/envs/slicgw/bin/activate
 
 module load modules/2.2-20230808
 module load cuda/11.8
