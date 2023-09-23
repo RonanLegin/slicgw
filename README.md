@@ -23,36 +23,43 @@ Activate the created virtual environment:
 source slicgw/bin/activate
 ```
 
-### 4. Loading Necessary Modules
-Load the required modules for running the code:
-```bash
-module load modules/2.2-20230808
-module load cuda/11.8
-module load cudnn/8.9.2.26
-```
-
-### 5. Upgrading Pip
+### 4. Upgrading Pip
 Upgrade pip to the latest version:
 ```bash
 pip install --upgrade pip
 ```
 
-### 6. Installing JAX with CUDA Support
+### 5. Installing JAX with CUDA Support
 Install JAX with CUDA support from the specified URL:
 ```bash
 pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
-### 7. Installing Flax from GitHub
+### 6. Installing Flax from GitHub
 Install Flax directly from the GitHub repository (it is important that Flax is installed after JAX to enable GPU support):
 ```bash
 pip install --upgrade git+https://github.com/google/flax.git
 ```
 
-### 8. Installing RippleGW and Corner
-Finally, install `ripplegw` and `corner` packages:
+### 7. Installing RippleGW and Corner
+Install `ripplegw` and `corner` packages:
 ```bash
 pip3 install ripplegw corner
+```
+
+### 8. Cloning and Installing the Scoregen Package
+Install the diffusion model package:
+```bash
+git clone git@github.com:RonanLegin/scoregen_jax.git
+cd scoregen_jax
+python setup.py install
+```
+
+### 9. Installing slicgw package
+Install the `slicgw` package:
+```bash
+cd slicgw
+python setup.py install
 ```
 
 ## Possible Issues and Resolutions
