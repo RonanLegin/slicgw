@@ -2,18 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import corner
 
-import jax
-import jax.numpy as jnp
-from jax import grad, vmap, jacfwd, jit, jacrev, vjp
-import orbax
-
-from scoregen.models import State, init_model, get_config, get_score_fn
-from scoregen.sampling import get_sampler as get_sampler_noise
-from scoregen import VESDE
-
 import pandas as pd
 import h5py
 import os
+
 
 def read_data(path, **kws):
     with h5py.File(path, 'r') as f:
@@ -23,97 +15,6 @@ def read_data(path, **kws):
         dt = T/len(h)
         time = t0 + dt*np.arange(len(h))
         return pd.Series(h, index=time, **kws)
-
-
-def load_score_model(config_path, checkpoint_path):
-    
-    # Get SLIC model config
-    config = get_config(config_path)
-
-    rng = jax.random.PRNGKey(config.seed)
-    rng, step_rng = jax.random.split(rng)
-    score_model, init_model_state, initial_params = init_model(step_rng, config)
-    
-    # Initialize State
-    state = State(step=0, opt_state=None,
-                       lr=None,
-                       model_state=init_model_state,
-                       params=initial_params,
-                       ema_rate=config.model.ema_rate,
-                       params_ema=initial_params,
-                       rng=rng) 
-
-    # Load checkpoint
-    ckptr = orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler()) 
-    state = ckptr.restore(checkpoint_path, item=state)
-
-    # Setup SDE
-    sde = VESDE(sigma_min=config.model.sigma_min, sigma_max=config.model.sigma_max, N=config.model.num_scales)
-    
-    return score_model, state, sde, rng, config
-
-
-
-def get_latest_checkpoint(checkpoint_dir):
-    # Get list of all checkpoints
-    checkpoints = os.listdir(checkpoint_dir)
-
-    # Remove non-integer named checkpoints if any
-    checkpoints = [ckpt for ckpt in checkpoints if ckpt.isdigit()]
-
-    # If there are no valid checkpoints, return None
-    if not checkpoints:
-        return None
-
-    # Convert to integer and find the maximum (latest)
-    checkpoints = [int(ckpt) for ckpt in checkpoints]
-    latest_checkpoint = max(checkpoints)
-
-    return latest_checkpoint
-
-### Plot results ###
-
-# def plot_results(chain, chain_score, truth, labels, filepath, index):
-#     chain = np.array(chain)
-#     chain_score = np.array(chain_score)
-
-#     N = chain.shape[0]
-#     batch_size = chain.shape[1]
-#     ndim = chain.shape[2]
-    
-#     truth = np.array(truth).reshape(ndim)
-
-#     fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
-#     for j, ax in enumerate(axs):
-#       for i in range(batch_size):
-#         ax.plot(chain[:,i,j])
-#       ax.axhline(truth[j], color='k', label='Truth')
-#       ax.set_title('Langevin Chain Param {}'.format(labels[j]))
-#     plt.legend()
-#     plt.savefig(filepath + 'chain{}.png'.format(index), bbox_inches='tight')
-#     plt.close(fig)
-
-#     fig, axs = plt.subplots(ndim, figsize=(8,6*ndim))
-#     for j, ax in enumerate(axs):
-#       for i in range(batch_size):
-#         ax.plot(chain_score[:,i,j])
-#       ax.set_title('Score Chain Param {}'.format(labels[j]))
-#     plt.savefig(filepath + 'chain_score{}.png'.format(index), bbox_inches='tight')
-#     plt.close(fig)
-
-#     samples = np.array(chain).reshape(-1,ndim)
-#     fig = plt.figure(figsize=(20,16))
-#     fig = corner.corner(
-#         samples,
-#         color='black',
-#         labels=labels,
-#         hist2d_kwargs={"normed": True}, 
-#         truths=(truth),
-#         fig=fig, bins=20
-#         )
-#     plt.savefig(filepath + 'corner{}.png'.format(index), bbox_inches='tight')
-#     plt.close(fig)
-
 
 def plot_complex_scatter(fourier_data, filepath, index, x_range=(-1.5, 1.5), y_range=(-1.5, 1.5), dot_size=2):
     # reshape the array to be at least 2D
@@ -167,7 +68,7 @@ def plot_phase_vs_frequency(fourier_data, f, filepath, index, dot_size=5):
 def plot_results(chain, chain_score, truth, labels, filepath, index):
     chain = np.array(chain)
     chain_score = np.array(chain_score)
-
+    
     N = chain.shape[0]
     batch_size = chain.shape[1]
     ndim = chain.shape[2]

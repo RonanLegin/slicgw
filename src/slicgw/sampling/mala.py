@@ -31,57 +31,56 @@ def delta_logp(current_state, proposed_state, score_fn, delta_logp_steps=2):
 
 def accept(rng, log_alpha):
     rng, step_rng = jax.random.split(rng)
-    accepted = jnp.log(jax.random.uniform(step_rng, log_alpha.shape, dtype=jax_dtype)) < log_alpha
+    accepted = jnp.log(jax.random.uniform(step_rng, log_alpha.shape, dtype=jnp.dtype(log_alpha))) < log_alpha
     return accepted, rng
 
 
+def apply_bounds(proposed_position, param_bounds, delta_logp_val):
+    if param_bounds is None:
+        return delta_logp_val
+    
+    mask = jnp.ones_like(delta_logp_val)
+    for i, bounds in enumerate(param_bounds):
+        if bounds is not None:
+            min_bound, max_bound = bounds
+            if min_bound is not None:
+                mask = jnp.where(proposed_position[:, i] < min_bound, 0, mask)
+            if max_bound is not None:
+                mask = jnp.where(proposed_position[:, i] > max_bound, 0, mask)
+    
+    return jnp.where(mask, delta_logp_val, -jnp.inf)
 
-def mala_step(rng, current_state, epsilon, score_fn, mass_matrix=None):
+
+def mala_step(rng, current_state, epsilon, score_fn, mass_matrix, param_bounds=None):
 
     current_position, current_score = current_state
 
     dims = list(range(1, len(current_position.shape)))
     rng, step_rng = jax.random.split(rng)
-
-
-    if mass_matrix is None:
-        proposed_position = current_position + epsilon * current_score + jnp.sqrt(2 * epsilon) * jax.random.normal(step_rng, current_position.shape, dtype=jax_dtype)
         
-        proposed_score = score_fn(proposed_position)
+    mass_matrix_2 = jnp.matmul(mass_matrix, mass_matrix.T)
 
-        delta_logp_val = delta_logp(current_position, proposed_position, score_fn, delta_logp_steps=10)
+    proposed_position = current_position + epsilon * jnp.matmul(current_score, mass_matrix_2.T) + jnp.sqrt(2 * epsilon) * jnp.matmul(jax.random.normal(step_rng, current_position.shape, dtype=jnp.dtype(current_position)), mass_matrix.T)
 
-        kernel_forward = jax.scipy.stats.multivariate_normal.logpdf(
-            proposed_position,
-            current_position + epsilon * current_score,
-            2 * epsilon)
+    proposed_score = score_fn(proposed_position)
 
-        kernel_backward = jax.scipy.stats.multivariate_normal.logpdf(
-            current_position, 
-            proposed_position + epsilon * proposed_score,
-            2 * epsilon)
-        
-    else:
-        proposed_position = current_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, current_score) + jnp.sqrt(2 * epsilon) * jnp.einsum('ij,bj->bi', mass_matrix, jax.random.normal(step_rng, current_position.shape, dtype=jax_dtype))
-        
-        proposed_score = score_fn(proposed_position)
+    delta_logp_val = delta_logp(current_position, proposed_position, score_fn, delta_logp_steps=2)
 
-        delta_logp_val = delta_logp(current_position, proposed_position, score_fn, delta_logp_steps=10)
+    kernel_forward = jax.scipy.stats.multivariate_normal.logpdf(
+        proposed_position,
+        current_position + epsilon * jnp.matmul(current_score, mass_matrix_2.T),
+        2 * epsilon * mass_matrix_2)
 
-        kernel_forward = jax.scipy.stats.multivariate_normal.logpdf(
-            proposed_position,
-            current_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, current_score),
-            2 * epsilon * mass_matrix @ mass_matrix.T)
-
-        kernel_backward = jax.scipy.stats.multivariate_normal.logpdf(
-            current_position, 
-            proposed_position + epsilon * jnp.einsum('ij,bj->bi', mass_matrix @ mass_matrix.T, proposed_score),
-            2 * epsilon * mass_matrix @ mass_matrix.T)
+    kernel_backward = jax.scipy.stats.multivariate_normal.logpdf(
+        current_position, 
+        proposed_position + epsilon * jnp.matmul(proposed_score, mass_matrix_2.T),
+        2 * epsilon * mass_matrix_2)
     
-    
-    log_alpha = delta_logp_val - kernel_backward + kernel_forward
+    delta_logp_val = apply_bounds(proposed_position, param_bounds, delta_logp_val)
+
+    log_alpha = delta_logp_val + kernel_backward - kernel_forward
     accepted, rng = accept(rng, log_alpha)
-
+    
     proposed_position = jnp.where(accepted[..., jnp.newaxis], proposed_position, current_position)
     proposed_score = jnp.where(accepted[..., jnp.newaxis], proposed_score, current_score)
 
