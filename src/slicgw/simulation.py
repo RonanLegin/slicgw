@@ -17,66 +17,6 @@ def sample_uniform_prior(rng, param_bounds):
         theta.append(param)
     return rng, jnp.array(theta)
 
-    
-def model_fd_4d(theta, args):
-        
-    f = args['f']
-    f_filtered = args['f_filtered']
-    f_ref = args['f_ref']
-    Fp = args['Fp']
-    Fc = args['Fc']
-    
-    psd_sqrt = args['psd_sqrt']
-    
-    Mc = theta[0]
-    eta = theta[1]
-    chi1 = args['chi1']
-    chi2 = args['chi2']
-    dist_mpc = theta[2]
-    tc = args['tc']
-    phic = theta[3]
-    inclination = args['inclination']
-    
-    theta = jnp.array([Mc, eta, chi1, chi2, dist_mpc, tc, phic, inclination, 0.], dtype=jnp.float64)
-    
-    hp_ripple, hc_ripple = IMRPhenomD.gen_IMRPhenomD_hphc(f_filtered, theta, f_ref)
-    
-    source_fd = Fp * hp_ripple + Fc * hc_ripple
-    source_fd = jnp.pad(source_fd, (f.shape[0] - source_fd.shape[0], 0), constant_values=0.)
-    
-    df = f[1] - f[0]
-    source_fd_whiten = source_fd/(psd_sqrt/jnp.sqrt(df)/jnp.sqrt(2))
-    return source_fd_whiten
-
-# def model_td_3d(theta, args):
-    
-        
-#     f = args['f']
-#     f_filtered = args['f_filtered']
-#     f_ref = args['f_ref']
-#     Fp = args['Fp']
-#     Fc = args['Fc']
-#     psd_sqrt = args['psd_sqrt']
-    
-#     Mc = theta[0]
-#     eta = args['eta']
-#     chi1 = args['chi1']
-#     chi2 = args['chi2']
-#     dist_mpc = theta[1]
-#     tc = theta[2]
-#     phic = args['phic']
-#     inclination = args['inclination']
-    
-#     theta = jnp.array([Mc, eta, chi1, chi2, dist_mpc, tc, phic, inclination, 0.], dtype=jnp.float64)
-    
-#     hp_ripple, hc_ripple = IMRPhenomD.gen_IMRPhenomD_hphc(f_filtered, theta, f_ref)
-    
-#     source_fd = Fp * hp_ripple + Fc * hc_ripple
-#     source_fd = jnp.pad(source_fd, (f.shape[0] - source_fd.shape[0], 0), constant_values=0.)
-#     source_fd_whiten = source_fd / (psd_sqrt / jnp.sqrt(2*dt))
-#     source_td_whiten = jnp.fft.irfft(source_fd_whiten) / dt
-#     return source_td_whiten
-
 
 def model_td_3d(theta, args):
     
@@ -106,16 +46,6 @@ def model_td_3d(theta, args):
     source_fd /= jnp.sqrt(f.shape[0])
     source_fd = (source_fd - fourier_mean_avg)/fourier_sigma_avg
     source_fd = jnp.pad(source_fd, (f.shape[0] - source_fd.shape[0], 0), constant_values=0.)
-    
-    
-#     source_fd_whiten = source_fd / (psd_sqrt / jnp.sqrt(2*dt))
-#     source_td_whiten = jnp.fft.irfft(source_fd_whiten) / dt
-    ############# EXCEPTION ##############
-    
-    #############
-    # source_fd_whiten = source_fd / (psd_sqrt / jnp.sqrt(2*dt))
-    
-    # source_td_whiten = jnp.fft.irfft(source_fd_whiten, norm='ortho') / dt
     source_td_whiten = jnp.fft.irfft(source_fd, norm='ortho')
     
     return source_td_whiten
@@ -123,13 +53,14 @@ def model_td_3d(theta, args):
 
 def model_td_4d(theta, args):
     
-        
     f = args['f']
     f_filtered = args['f_filtered']
     f_ref = args['f_ref']
     Fp = args['Fp']
     Fc = args['Fc']
-    psd_sqrt = args['psd_sqrt']
+    fourier_mean_avg = args['fourier_mean_avg']
+    fourier_sigma_avg = args['fourier_sigma_avg']
+    window = args['window']
     
     Mc = theta[0]
     eta = theta[1]
@@ -145,44 +76,14 @@ def model_td_4d(theta, args):
     hp_ripple, hc_ripple = IMRPhenomD.gen_IMRPhenomD_hphc(f_filtered, theta, f_ref)
     
     source_fd = Fp * hp_ripple + Fc * hc_ripple
+    source_fd /= jnp.sqrt(f.shape[0])
+    source_fd = (source_fd - fourier_mean_avg)/fourier_sigma_avg
     source_fd = jnp.pad(source_fd, (f.shape[0] - source_fd.shape[0], 0), constant_values=0.)
-    source_fd_whiten = source_fd / (psd_sqrt / jnp.sqrt(2*dt))
-    source_td_whiten = jnp.fft.irfft(source_fd_whiten) / dt
+    source_td_whiten = jnp.fft.irfft(source_fd, norm='ortho') * window
     return source_td_whiten
 
-# def model_td_5d(theta, args):
-    
-        
-#     f = args['f']
-#     f_filtered = args['f_filtered']
-#     f_ref = args['f_ref']
-#     Fp = args['Fp']
-#     Fc = args['Fc']
-#     psd_sqrt = args['psd_sqrt']
-    
-#     Mc = theta[0]
-#     eta = theta[1]
-#     chi1 = args['chi1']
-#     chi2 = args['chi2']
-#     dist_mpc = theta[2]
-#     tc = theta[3]
-#     phic = theta[4]
-#     inclination = args['inclination']
-    
-#     theta = jnp.array([Mc, eta, chi1, chi2, dist_mpc, tc, phic, inclination, 0.], dtype=jnp.float64)
-    
-#     hp_ripple, hc_ripple = IMRPhenomD.gen_IMRPhenomD_hphc(f_filtered, theta, f_ref)
-    
-#     source_fd = Fp * hp_ripple + Fc * hc_ripple
-#     source_fd = jnp.pad(source_fd, (f.shape[0] - source_fd.shape[0], 0), constant_values=0.)
-#     source_fd_whiten = source_fd / (psd_sqrt / jnp.sqrt(2*dt))
-#     source_td_whiten = jnp.fft.irfft(source_fd_whiten) / dt
-#     return source_td_whiten
-
-# EXCEPTIOOOONNMN!!!!! LOOK AT THE ORTHO NORM
 
 def model_td_5d(theta, args):
-    
         
     f = args['f']
     f_filtered = args['f_filtered']
@@ -210,16 +111,6 @@ def model_td_5d(theta, args):
     source_fd /= jnp.sqrt(f.shape[0])
     source_fd = (source_fd - fourier_mean_avg)/fourier_sigma_avg
     source_fd = jnp.pad(source_fd, (f.shape[0] - source_fd.shape[0], 0), constant_values=0.)
-    
-    
-#     source_fd_whiten = source_fd / (psd_sqrt / jnp.sqrt(2*dt))
-#     source_td_whiten = jnp.fft.irfft(source_fd_whiten) / dt
-    ############# EXCEPTION ##############
-    
-    #############
-    # source_fd_whiten = source_fd / (psd_sqrt / jnp.sqrt(2*dt))
-    
-    # source_td_whiten = jnp.fft.irfft(source_fd_whiten, norm='ortho') / dt
     source_td_whiten = jnp.fft.irfft(source_fd, norm='ortho') * window
     return source_td_whiten
 
@@ -227,7 +118,6 @@ def model_td_5d(theta, args):
 
 def model_td_7d(theta, args):
     
-        
     f = args['f']
     f_filtered = args['f_filtered']
     f_ref = args['f_ref']
