@@ -35,11 +35,15 @@ EOF
 # Check if the script is running on a compute node or login node
 
 echo "Running download phase on the login node..."
-source /home/ronan/scratch/slicgw/slic_env/bin/activate
+source /home/ronan/scratch/slicgw/slicgwenv/bin/activate
 
 python fetch_gwosc_data.py --operation fetch --output_folder_name $OUTPUT_FOLDER_TRAIN --t0 $T0 --duration $DURATION_TRAIN --ifo $IFO --seglen_upfactor $SEGLEN_UPFACTOR
 
 python fetch_gwosc_data.py --operation fetch --output_folder_name $OUTPUT_FOLDER_TEST --t0 $(($T0 + 2 * $DURATION_TRAIN)) --duration $DURATION_TEST --ifo $IFO --seglen_upfactor $SEGLEN_UPFACTOR
+
+wget -nc -i "../data/${OUTPUT_FOLDER_TRAIN}/gwosc_urls_${IFO}.txt" -P "../data/${OUTPUT_FOLDER_TRAIN}/raw_${IFO}/"
+
+wget -nc -i "../data/${OUTPUT_FOLDER_TEST}/gwosc_urls_${IFO}txt" -P "../data/${OUTPUT_FOLDER_TEST}/raw_${IFO}/"
 
 echo "Download successful, submitting compute job to SLURM."
 submit_compute_job

@@ -41,9 +41,9 @@ python fetch_gwosc_data.py --operation fetch --output_folder_name $OUTPUT_FOLDER
 
 python fetch_gwosc_data.py --operation fetch --output_folder_name $OUTPUT_FOLDER_TEST --t0 $(($T0 + 2 * $DURATION_TRAIN)) --duration $DURATION_TEST --ifo $IFO --seglen_upfactor $SEGLEN_UPFACTOR
 
-wget -nc -i "../data/${OUTPUT_FOLDER_TRAIN}/gwosc_urls.txt" -P "../data/${OUTPUT_FOLDER_TRAIN}/raw_${IFO}/"
+wget -nc -i "../data/${OUTPUT_FOLDER_TRAIN}/gwosc_urls_${IFO}.txt" -P "../data/${OUTPUT_FOLDER_TRAIN}/raw_${IFO}/"
 
-wget -nc -i "../data/${OUTPUT_FOLDER_TEST}/gwosc_urls.txt" -P "../data/${OUTPUT_FOLDER_TEST}/raw_${IFO}/"
+wget -nc -i "../data/${OUTPUT_FOLDER_TEST}/gwosc_urls_${IFO}.txt" -P "../data/${OUTPUT_FOLDER_TEST}/raw_${IFO}/"
 
 echo "Download successful, submitting compute job to SLURM."
 submit_compute_job

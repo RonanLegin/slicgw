@@ -44,30 +44,56 @@ def main(save_dir, args):
     bulk_start_time = args.t0 - args.duration//2
     bulk_end_time = args.t0 + args.duration//2
     
+    # if args.operation == 'fetch':
+    #     print('Fetching data.')
+        
+    #     url = 'https://www.gw-openscience.org/eventapi/jsonfull/GWTC/'
+    #     with requests.get(url) as r:
+    #         rjson = r.json()
+
+    #     with open(os.path.join(save_dir, 'gwosc_data.json'), 'w') as file:
+    #         json.dump(rjson, file)
+        
+    #     # get time segments of available data within the specified 'bulk' time
+    #     segments = get_segments(f'{args.ifo}_DATA', bulk_start_time, bulk_end_time)
+
+    #     # get URLs of data files for the above segments
+    #     urls = get_urls(args.ifo, segments[0][0], segments[-1][-1], sample_rate=srate)
+        
+    #     # decide whether to download a file that already exists
+    #     force = False
+    #     for url in urls:
+    #         fname = os.path.basename(url)
+    #         file_path = os.path.join(save_dir, 'raw_{}/'.format(args.ifo), fname)
+    #         if not os.path.exists(file_path) or force:
+    #             wget.download(url, file_path)
+            
     if args.operation == 'fetch':
         print('Fetching data.')
-        
+
+        # Get event JSON from GWOSC
         url = 'https://www.gw-openscience.org/eventapi/jsonfull/GWTC/'
         with requests.get(url) as r:
             rjson = r.json()
 
+        # Save JSON response
+        os.makedirs(save_dir, exist_ok=True)
         with open(os.path.join(save_dir, 'gwosc_data.json'), 'w') as file:
             json.dump(rjson, file)
-        
-        # get time segments of available data within the specified 'bulk' time
+
+        # Get available data segments in desired time range
         segments = get_segments(f'{args.ifo}_DATA', bulk_start_time, bulk_end_time)
 
-        # get URLs of data files for the above segments
+        # Get file URLs
         urls = get_urls(args.ifo, segments[0][0], segments[-1][-1], sample_rate=srate)
-        
-        # decide whether to download a file that already exists
-        force = False
-        for url in urls:
-            fname = os.path.basename(url)
-            file_path = os.path.join(save_dir, 'raw_{}/'.format(args.ifo), fname)
-            if not os.path.exists(file_path) or force:
-                wget.download(url, file_path)
-            
+
+        # Save URLs to txt file
+        url_txt_path = os.path.join(save_dir, f'gwosc_urls_{args.ifo}.txt')
+        with open(url_txt_path, 'w') as f:
+            for url in urls:
+                f.write(f"{url}\n")
+
+        print(f"Saved {len(urls)} URLs to: {url_txt_path}")
     
     if args.operation == 'preprocess':
         print('Preprocessing data.')
