@@ -1,0 +1,1 @@
+{"operation": "fetch", "output_folder_name": "real_white_noise_test/", "t0": 1131097862, "duration": 172800, "ifo": "H1", "seglen_upfactor": 2, "max_num_hours": 50, "whitening_factor_directory": null}

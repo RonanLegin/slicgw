@@ -1,0 +1,1 @@
+{"operation": "fetch", "output_folder_name": "real_white_noise_train/", "t0": 1126259462, "duration": 2419200, "ifo": "L1", "seglen_upfactor": 2, "max_num_hours": 50, "whitening_factor_directory": null}
