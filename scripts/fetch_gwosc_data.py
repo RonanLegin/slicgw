@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import h5py
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 
 from scipy.signal.windows import tukey
 import scipy.signal as sl
@@ -62,7 +62,6 @@ def main(save_dir, args):
         
         # decide whether to download a file that already exists
         force = False
-
         for url in urls:
             fname = os.path.basename(url)
             file_path = os.path.join(save_dir, 'raw_{}/'.format(args.ifo), fname)
