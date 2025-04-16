@@ -113,12 +113,11 @@ def main(save_dir, args):
             full_data, dq_mask, inj_mask = read_data(path)
             
             dq_mask_all = (dq_mask & 0x7F) == 0x7F
-            inj_mask_all = (inj_mask & 0x1F) == 0x1F
             num_segments = len(full_data) // Nsize
             
+            
             for i in range(num_segments):
-
-                if np.all(dq_mask_all[args.seglen_upfactor*seglen*i:args.seglen_upfactor*seglen*(i+1)]) and np.all(inj_mask_all[args.seglen_upfactor*seglen*i:args.seglen_upfactor*seglen*(i+1)]):
+                if np.all(dq_mask_all[args.seglen_upfactor*seglen*i:args.seglen_upfactor*seglen*(i+1)]):
                     segment = full_data.iloc[i*Nsize:(i+1)*Nsize]
                     fd_segment = np.fft.rfft(segment * w) * dt
                     fourier_transforms.append(fd_segment)
@@ -127,13 +126,9 @@ def main(save_dir, args):
             
             if len(data_set) > args.max_num_hours:
                 break
-        
-        if args.whitening_factor_directory is not None:
-            fourier_mean = np.load(os.path.join('../data/', args.whitening_factor_directory, 'fourier_mean_{}.npy'.format(args.ifo)))
-            fourier_sigma = np.load(os.path.join('../data/', args.whitening_factor_directory, 'fourier_sigma_{}.npy'.format(args.ifo)))
-        else:
-            fourier_mean = np.mean(np.array(fourier_transforms), axis=0)
-            fourier_sigma = np.std(np.array(fourier_transforms), axis=0)
+        print('fourier transforms:', len(fourier_transforms))
+        fourier_mean = np.mean(np.array(fourier_transforms), axis=0)
+        fourier_sigma = np.std(np.array(fourier_transforms), axis=0)
         
         seg_td_cov_samples = []
         for seg_fd in fourier_transforms:
