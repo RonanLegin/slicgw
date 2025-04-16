@@ -11,7 +11,7 @@ from jax.lib import xla_bridge
 print('device used:', xla_bridge.get_backend().platform)
 
 
-from slicgw.simulation import model_fd_4d, model_td_3d, model_td_4d, model_td_5d, model_td_7d, model_dummy, sample_uniform_prior
+from slicgw.simulation import model_td_3d, model_td_4d, model_td_5d, model_td_7d, model_dummy, sample_uniform_prior
 from slicgw.sampling.mala import mala_step as step_fn
 from slicgw.sampling.mala import mala_step as step_burn_fn # Using MALA instead of ULA for warmup phase
 from slicgw.sampling.utils import get_sample_fn
