@@ -37,6 +37,7 @@ import json
 # Note: this script assumes that the parameters to be inferred all have uniform priors.
 # Note: This uniform prior is enforced as if conditions in the sampling code located in the src folder.
 
+GLITCH_IFO = "H1"
 
 def main(save_dir, args):
        
@@ -51,7 +52,7 @@ def main(save_dir, args):
     sampling_noise_fn = get_sampler_noise(sde, model, shape=(1, seglen*srate, 1), t_min=1e-5)
     sampling_noise_fn_jit = jax.jit(sampling_noise_fn)
     
-    with open(os.path.join(config.data.data_test_directory, 'params_{}.json'.format(args.ifo)), 'r') as file:
+    with open(os.path.join(config.data.data_test_directory, 'params_{}.json'.format(GLITCH_IFO)), 'r') as file:
         config_data = json.load(file)
 
     seglen_upfactor = config_data.get('seglen_upfactor')
@@ -61,17 +62,17 @@ def main(save_dir, args):
     else:
         raise ValueError("Parameter 'seglen_upfactor' not found in the JSON file.")
 
-    noise_samples = np.load(os.path.join(config.data.data_test_directory, 'noise_{}.npy'.format(args.ifo)))
-    fourier_mean_avg = np.load(os.path.join(config.data.data_test_directory, 'fourier_mean_{}.npy'.format(args.ifo)))
-    fourier_sigma_avg = np.load(os.path.join(config.data.data_test_directory, 'fourier_sigma_{}.npy'.format(args.ifo)))
+    noise_glitch = jnp.array(np.load('../data/noise_glitch.npy'))
+    fourier_mean_avg = np.load(os.path.join(config.data.data_test_directory, 'fourier_mean_{}.npy'.format(GLITCH_IFO)))
+    fourier_sigma_avg = np.load(os.path.join(config.data.data_test_directory, 'fourier_sigma_{}.npy'.format(GLITCH_IFO)))
     
     if args.score_type == 'gaussian':
-        white_noise_std = np.sqrt(np.diag(np.load(os.path.join(config.data.data_test_directory, 'covariance_{}.npy'.format(args.ifo)))))
+        white_noise_std = np.sqrt(np.diag(np.load(os.path.join(config.data.data_test_directory, 'covariance_{}.npy'.format(GLITCH_IFO)))))
         white_noise_std = jnp.array(np.sqrt(white_noise_std**2 + sde.marginal_prob(None, t_min)[1]**2))
 
     tc_center = (2 * f.shape[0] / srate) / 2
     
-    Fp, Fc = antenna_patterns[args.ifo]
+    Fp, Fc = antenna_patterns[GLITCH_IFO]
     
     sim_args['fourier_mean_avg'] = jnp.array(fourier_mean_avg)[f >= f_ref]
     sim_args['fourier_sigma_avg'] =  jnp.array(fourier_sigma_avg)[f >= f_ref]
@@ -150,75 +151,57 @@ def main(save_dir, args):
     else:
         raise ValueError(f"cannot find score function option with name {args.score_type}")
     score_likelihood_vmap = jax.jit(vmap(score_likelihood, in_axes=(0,0, None)))
+
     
+    rng = jax.random.PRNGKey(9872)
+    rng, sample_rng = jax.random.split(rng)
 
-    for i in args.index_array:
-        
-        rng = jax.random.PRNGKey(i + 9872)
-        rng, sample_rng = jax.random.split(rng)
-        
-        # Sample true theta
-        _, theta_true = sample_uniform_prior(sample_rng, param_bounds)
-        ndim = theta_true.shape[0]
+    # Sample true theta
+    theta_true = jnp.array([22.8, 0.187, -0.807, -0.889, 678, 1.501 + 2.0, 0.830]) # example from the paper, +2 to t0 due to upseglen_factor
+    ndim = theta_true.shape[0]
 
-        
-        
-        # Generate noise realization
-        rng, step_rng = jax.random.split(rng)
-        if args.noise_type == 'white':
-            noise = 1.0 * jax.random.normal(step_rng, shape=(seglen*srate,))
-        elif args.noise_type == 'slic':
-            noise = sampling_noise_fn_jit(step_rng, state).reshape(-1, seglen*srate)[0]
-        elif args.noise_type == 'real':
-            sample_index = jax.random.randint(step_rng, shape=(), minval=0, maxval=noise_samples.shape[0])
-            noise = noise_samples[sample_index]
-        else:
-            raise ValueError(f"cannot find noise type with name {args.noise_type}")
-        
-        
-        # Simulate signal
-        signal = gw_model(theta_true, sim_args)[seglen_upfactor*seglen*srate//2 - seglen*srate//2:seglen_upfactor*seglen*srate//2 + seglen*srate//2]
-        
-        if args.add_diffusion_noise:
-            rng, step_rng = jax.random.split(rng)
-            diffusion_noise = sde.marginal_prob(None, t_min)[1] * jax.random.normal(step_rng, shape=(noise.shape[0],))
-            data = signal + noise + diffusion_noise
-        else:
-            data = signal + noise
-        
-        
-        plt.figure()
-        plt.plot(np.linspace(0., seglen, data.shape[0]), np.clip(data, -60, 60), label='Mock data') # Clipping range in case of massive glitch
-        plt.plot(np.linspace(0., seglen, data.shape[0]), signal, label='True signal')
-        plt.ylabel('Amplitude')
-        plt.xlabel('Time (seconds)')
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(os.path.join(save_dir, 'data{}.png'.format(i)), dpi=175)
-        plt.close() 
-        
-        print('Initial mass matrix. ', mass_matrix)
-        
-        print('Sampling {}.'.format(i))
-        
-        rng, step_rng = jax.random.split(rng)
-        theta_initial = jax.random.multivariate_normal(step_rng, theta_true, 0.001**2 * jnp.diag(jnp.diag(mass_matrix @ mass_matrix.T)), shape=(args.num_walkers,))
-        theta_initial = jnp.clip(theta_initial, a_min=jnp.array([b[0] for b in param_bounds]), a_max=jnp.array([b[1] for b in param_bounds])) # Clip within prior bounds
-        print('initial walker points:', theta_initial)
-        
-        rng, step_rng = jax.random.split(rng)
-        step_burn_fn_jit = jax.jit(step_burn_fn, static_argnums=(3,))
-        step_fn_jit = jax.jit(step_fn, static_argnums=(3,))
-        
-        sample_fn = get_sample_fn(step_fn_jit, step_burn_fn_jit, score_likelihood_vmap, args.num_steps, args.num_burn_steps, mass_matrix, param_bounds, adapt_stepsize=True)
-        chain, chain_score = sample_fn(rng, theta_initial, data, sim_args, args.step_size)
 
-        try:
-            np.save(os.path.join(save_dir, 'chains{}.npy').format(i), np.array(chain))
-            np.save(os.path.join(save_dir, 'theta_true{}.npy').format(i), np.array(theta_true))
-            plot_results(np.array(chain), np.array(chain_score), np.asarray(theta_true), theta_labels, save_dir, i)
-        except Exception as e:
-            pass                
+    # Simulate signal
+    signal = gw_model(theta_true, sim_args)[seglen_upfactor*seglen*srate//2 - seglen*srate//2:seglen_upfactor*seglen*srate//2 + seglen*srate//2]
+
+    if args.add_diffusion_noise:
+        rng, step_rng = jax.random.split(rng)
+        diffusion_noise = sde.marginal_prob(None, t_min)[1] * jax.random.normal(step_rng, shape=(noise_glitch.shape[0],))
+        data = signal + noise_glitch + diffusion_noise
+    else:
+        data = signal + noise_glitch
+
+
+    plt.figure()
+    plt.plot(np.linspace(0., seglen, data.shape[0]), np.clip(data, -60, 60), label='Mock data') # Clipping range in case of massive glitch
+    plt.plot(np.linspace(0., seglen, data.shape[0]), signal, label='True signal')
+    plt.ylabel('Amplitude')
+    plt.xlabel('Time (seconds)')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, 'data_glitch.png'), dpi=175)
+    plt.close() 
+
+    print('Initial mass matrix. ', mass_matrix)
+
+    print('Sampling Begins.')
+
+    rng, step_rng = jax.random.split(rng)
+    theta_initial = jax.random.multivariate_normal(step_rng, theta_true, 0.001**2 * jnp.diag(jnp.diag(mass_matrix @ mass_matrix.T)), shape=(args.num_walkers,))
+    theta_initial = jnp.clip(theta_initial, a_min=jnp.array([b[0] for b in param_bounds]), a_max=jnp.array([b[1] for b in param_bounds])) # Clip within prior bounds
+    print('initial walker points:', theta_initial)
+
+    rng, step_rng = jax.random.split(rng)
+    step_burn_fn_jit = jax.jit(step_burn_fn, static_argnums=(3,))
+    step_fn_jit = jax.jit(step_fn, static_argnums=(3,))
+
+    sample_fn = get_sample_fn(step_fn_jit, step_burn_fn_jit, score_likelihood_vmap, args.num_steps, args.num_burn_steps, mass_matrix, param_bounds, adapt_stepsize=True)
+    chain, chain_score = sample_fn(rng, theta_initial, data, sim_args, args.step_size)
+
+    np.save(os.path.join(save_dir, 'chains.npy'), np.array(chain))
+    np.save(os.path.join(save_dir, 'theta_true.npy'), np.array(theta_true))
+    plot_results(np.array(chain), np.array(chain_score), np.asarray(theta_true), theta_labels, save_dir, 0)
+              
 
 
         
@@ -229,7 +212,6 @@ if __name__ == '__main__':
     parser.add_argument("--noise_type", type=str, choices=["white", "slic", "real", "real_glitch"], help="Choose the type of noise (white, slic, real)")
     parser.add_argument("--score_type", type=str, choices=["gaussian", "slic"], help="Choose the type of score function for the noise distribution(gaussian, slic)")
     parser.add_argument("--workdir", type=str, default="./run_slic/", help="Path to the working directory of the model.")
-    parser.add_argument("--ifo", type=str, choices=["H1", "L1"], default="H1", help="Instrument ('H1', 'L1').")
     parser.add_argument("--output_folder_name", type=str, default="inference/", help="Output folder to save files in.")
     parser.add_argument("--t_min", type=float, default=0.1, help="Minimum time to fix slic model at.")
     parser.add_argument("--step_size", type=float, default=0.1, help="Step size of MALA sampler.")
@@ -238,7 +220,6 @@ if __name__ == '__main__':
     parser.add_argument("--num_steps", type=int, default=2000, help="Number of MALA steps.")
     parser.add_argument("--num_burn_steps", type=int, default=0, help="Number of burn-in MALA steps.")
     parser.add_argument('--add_diffusion_noise', action='store_true', help='Add diffusion noise to data noise.')
-    parser.add_argument("--index_array", nargs="+", type=int, help="List of indices to process.")
 
 
     args = parser.parse_args()
